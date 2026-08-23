@@ -1,26 +1,35 @@
 # 🛍️ E-Commerce AI Customer Support Chatbot System
 
-![Node.js](https://img.shields.io/badge/Node.js-v18%2B-43853D?style=for-the-badge&logo=node.js&logoColor=white)
-![Express](https://img.shields.io/badge/Express-4.19-000000?style=for-the-badge&logo=express&logoColor=white)
-![Shopify](https://img.shields.io/badge/Shopify-Admin_REST_2024--01-95BF47?style=for-the-badge&logo=shopify&logoColor=white)
-![Groq](https://img.shields.io/badge/Groq-Llama_3.1_8B-F15A24?style=for-the-badge)
-![Google](https://img.shields.io/badge/Google-Gemini_1.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-F7B93E?style=for-the-badge)
+[![Node.js](https://img.shields.io/badge/Node.js-v18%2B-green.svg)](https://nodejs.org/)
+[![Express.js](https://img.shields.io/badge/Express-4.x-blue.svg)](https://expressjs.com/)
+[![Shopify API](https://img.shields.io/badge/Shopify-Admin%20REST%202024--01-95BF47.svg)](https://shopify.dev/)
+[![Groq](https://img.shields.io/badge/Groq-Llama%203.1-orange.svg)](https://groq.com/)
+[![Gemini](https://img.shields.io/badge/Google-Gemini%201.5%20Flash-4285F4.svg)](https://ai.google.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-A production-ready, resilient full-stack application and Node.js & Express backend for an intelligent E-commerce customer support chatbot system tailored for online retail storefronts.
+*A production-ready, resilient full-stack application — Node.js & Express backend plus a React frontend — for an intelligent e-commerce customer support chatbot built for online retail storefronts.*
+
+## Table of Contents
+
+- [Key Architecture Highlights](#-key-architecture-highlights)
+- [Project Structure](#️-project-structure)
+- [Quickstart Guide](#-quickstart-guide)
+- [API Endpoints](#-key-rest-api-endpoints)
+- [Security & Reliability](#️-security--reliability)
+- [License](#-license)
 
 ---
 
 ## 🌟 Key Architecture Highlights
 
-* **Zero External Vector DB Knowledge Base:** Parses policies, FAQs, and product catalog variants directly into structured memory at startup for sub-millisecond keyword and context retrieval.
-* **Shopify Admin REST API Integration:** Live real-time order lookups, inventory status queries, and customer validation with seamless offline CSV fallback logic.
-* **Dual-LLM Resilient Fallback Pipeline:**
-  * **Primary Provider:** Google Gemini 1.5 Flash for fast and cost-effective reasoning.
-  * **Secondary / Fallback Provider:** Groq (`llama-3.1-8b-instant`) with automatic timeout-triggered failover.
-* **Smart Escalation Matrix:** Real-time keyword scanning (refunds, damaged goods, chargebacks, human handoff) + post-LLM sentiment analysis with optional Discord and SMTP email notifications.
-* **Cost & Token Analytics:** Per-session and per-model input/output token tracking with real-time USD cost estimation returned in API responses.
-* **Production Hardened:** Built-in rate-limiting, Helmet security headers, CORS protection, structured logging, and multi-turn session memory with automatic TTL cleanup.
+- **Zero External Vector DB Knowledge Base** — Parses policies, FAQs, and product catalog variants directly into structured memory at startup for sub-millisecond keyword and context retrieval.
+- **Shopify Admin REST API Integration** — Live real-time order lookups, inventory status queries, and customer validation, with seamless offline CSV fallback logic.
+- **Dual-LLM Resilient Fallback Pipeline**
+  - **Primary:** Google Gemini 1.5 Flash — fast, cost-effective reasoning.
+  - **Fallback:** Groq (`llama-3.1-8b-instant`) with automatic timeout-triggered failover.
+- **Smart Escalation Matrix** — Real-time keyword scanning (refunds, damaged goods, chargebacks, human handoff) plus post-LLM sentiment analysis, with optional Discord and SMTP email notifications.
+- **Cost & Token Analytics** — Per-session and per-model input/output token tracking, with real-time USD cost estimation returned directly in API responses.
+- **Production Hardened** — Built-in rate limiting, Helmet security headers, CORS protection, structured logging, and multi-turn session memory with automatic TTL cleanup.
 
 ---
 
@@ -54,7 +63,7 @@ ecommerce-customer-support-automation/
 │       ├── requestLogger.js               # HTTP request logging
 │       └── errorHandler.js                # Centralized error & 404 handler
 │
-├── components/                            # Frontend UI Components
+├── components/                            # Frontend UI components
 │   ├── Storefront.tsx                     # Product catalog showcase UI
 │   └── ChatWidget.tsx                     # Floating AI support assistant interface
 │
@@ -62,28 +71,39 @@ ecommerce-customer-support-automation/
 ├── package.json
 ├── .env.example
 └── .gitignore
+```
 
-🚀 Quickstart Guide
-1. Prerequisites
-Node.js: v18.0.0 or higher
+---
 
-npm: v9.0.0 or higher
+## 🚀 Quickstart Guide
 
-2. Installation
+### 1. Prerequisites
+
+- **Node.js**: v18.0.0 or higher
+- **npm**: v9.0.0 or higher
+
+### 2. Installation
+
+```bash
 # Clone the repository
-git clone [https://github.com/ishmal-codes/E-commerce-customer-support-automation.git](https://github.com/ishmal-codes/E-commerce-customer-support-automation.git)
+git clone https://github.com/ishmal-codes/E-commerce-customer-support-automation.git
 cd E-commerce-customer-support-automation
 
 # Install project dependencies
 npm install
+```
 
-3. Environment Configuration
-Create a .env file by copying .env.example:
+### 3. Environment Configuration
 
+Create a `.env` file by copying `.env.example`:
+
+```bash
 cp .env.example .env
+```
 
-Configure your environment variables inside .env:
+Then configure your environment variables inside `.env`:
 
+```env
 PORT=3000
 NODE_ENV=development
 
@@ -104,20 +124,29 @@ LLM_TIMEOUT_MS=8000
 DISCORD_WEBHOOK_ENABLED=false
 DISCORD_WEBHOOK_URL=
 EMAIL_ENABLED=false
+```
 
-4. Run the Application
+### 4. Run the Application
 
+```bash
 # Start development server (with hot-reload)
 npm run dev
 
 # Start production server
 npm start
+```
 
-📡 Key REST API Endpoints
-1. Service Health Check
-GET /api/health
+---
 
-Sample Response:
+## 📡 Key REST API Endpoints
+
+### 1. Service Health Check
+
+`GET /api/health`
+
+**Sample Response:**
+
+```json
 {
   "status": "ok",
   "timestamp": "2026-08-23T17:30:00.000Z",
@@ -138,17 +167,25 @@ Sample Response:
     }
   }
 }
+```
 
-2. Chat with Support Assistant
-POST /api/chat
+### 2. Chat with Support Assistant
 
-Request Body:
+`POST /api/chat`
+
+**Request Body:**
+
+```json
 {
   "sessionId": "session-12345",
   "message": "Hi, what is the status of my order #10240?",
   "customerEmail": "customer@example.com"
 }
-Response Body:
+```
+
+**Response Body:**
+
+```json
 {
   "sessionId": "session-12345",
   "response": "Your order #10240 is currently in transit and scheduled for delivery within 2 business days.",
@@ -161,16 +198,19 @@ Response Body:
     "model": "gemini-1.5-flash"
   }
 }
+```
 
-🛡️ Security & Reliability
-Graceful Degradation: If the Shopify API becomes unreachable, the assistant automatically falls back to offline order data snapshots (Customer_Orders.csv).
+---
 
-Failover Redundancy: If Gemini times out (>8000ms) or hits rate limits, requests immediately fail over to Groq (llama-3.1-8b) without disruption.
+## 🛡️ Security & Reliability
 
-Anti-Abuse Safeguards: Built-in rate limiting restricts requests per IP (30 requests/minute default).
+- **Graceful Degradation** — If the Shopify API becomes unreachable, the assistant automatically falls back to offline order data snapshots (`Customer_Orders.csv`).
+- **Failover Redundancy** — If Gemini times out (>8000ms) or hits rate limits, requests immediately fail over to Groq (`llama-3.1-8b`) without disruption.
+- **Anti-Abuse Safeguards** — Built-in rate limiting restricts requests per IP (30 requests/minute by default).
+- **Prompt Injection Defense** — Strict system prompt guardrails prevent policy hallucination and restrict unauthorized transactional operations (e.g. unauthorized direct cash refunds).
 
-Prompt Injection Defense: Strict system prompt guardrails prevent policy hallucination and restrict unauthorized transactional operations (e.g., unauthorized direct cash refunds).
+---
 
-📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📄 License
 
+This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
