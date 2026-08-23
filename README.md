@@ -26,6 +26,7 @@ A production-ready, resilient full-stack application and Node.js & Express backe
 
 ## 🏗️ Project Structure
 
+```text
 ecommerce-customer-support-automation/
 ├── docs/                                  # Ground truth knowledge base & catalog
 │   ├── FAQ.txt                            # Store FAQs
@@ -62,31 +63,27 @@ ecommerce-customer-support-automation/
 ├── .env.example
 └── .gitignore
 
+🚀 Quickstart Guide
+1. Prerequisites
+Node.js: v18.0.0 or higher
 
----
+npm: v9.0.0 or higher
 
-## 🚀 Quickstart Guide
-
-### 1. Prerequisites
-* **Node.js:** `v18.0.0` or higher
-* **npm:** `v9.0.0` or higher
-
-### 2. Installation
-```bash
+2. Installation
 # Clone the repository
 git clone [https://github.com/ishmal-codes/E-commerce-customer-support-automation.git](https://github.com/ishmal-codes/E-commerce-customer-support-automation.git)
 cd E-commerce-customer-support-automation
 
 # Install project dependencies
 npm install
+
 3. Environment Configuration
 Create a .env file by copying .env.example:
 
-Bash
 cp .env.example .env
+
 Configure your environment variables inside .env:
 
-Code snippet
 PORT=3000
 NODE_ENV=development
 
@@ -107,20 +104,20 @@ LLM_TIMEOUT_MS=8000
 DISCORD_WEBHOOK_ENABLED=false
 DISCORD_WEBHOOK_URL=
 EMAIL_ENABLED=false
+
 4. Run the Application
-Bash
+
 # Start development server (with hot-reload)
 npm run dev
 
 # Start production server
 npm start
+
 📡 Key REST API Endpoints
 1. Service Health Check
 GET /api/health
 
 Sample Response:
-
-JSON
 {
   "status": "ok",
   "timestamp": "2026-08-23T17:30:00.000Z",
@@ -141,20 +138,17 @@ JSON
     }
   }
 }
+
 2. Chat with Support Assistant
 POST /api/chat
 
 Request Body:
-
-JSON
 {
   "sessionId": "session-12345",
   "message": "Hi, what is the status of my order #10240?",
   "customerEmail": "customer@example.com"
 }
 Response Body:
-
-JSON
 {
   "sessionId": "session-12345",
   "response": "Your order #10240 is currently in transit and scheduled for delivery within 2 business days.",
@@ -167,6 +161,7 @@ JSON
     "model": "gemini-1.5-flash"
   }
 }
+
 🛡️ Security & Reliability
 Graceful Degradation: If the Shopify API becomes unreachable, the assistant automatically falls back to offline order data snapshots (Customer_Orders.csv).
 
@@ -178,3 +173,4 @@ Prompt Injection Defense: Strict system prompt guardrails prevent policy halluci
 
 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
+
