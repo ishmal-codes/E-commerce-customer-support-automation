@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-sora);
+}
+
+@theme {
+  /* Warm paper neutrals — no pure white/black anywhere. */
+  --color-paper: #f4f1ea;
+  --color-cream: #fbfaf6;
+  --color-ink: #232019;
+  --color-ink-soft: #6b6455;
+  --color-line: #e3ddd0;
+
+  /* Evergreen — the brand's working color. */
+  --color-pine-50: #edf4ef;
+  --color-pine-100: #dceae0;
+  --color-pine-200: #b9d4c3;
+  --color-pine-300: #8fb89f;
+  --color-pine-400: #5e9678;
+  --color-pine-500: #3b7a59;
+  --color-pine-600: #2a6147;
+  --color-pine-700: #224e3a;
+  --color-pine-800: #1b3d2e;
+  --color-pine-900: #142e23;
+  --color-pine-950: #0c1f17;
+
+  /* Honey — escalation / human presence. */
+  --color-honey-50: #fbf4e6;
+  --color-honey-100: #f7e8c8;
+  --color-honey-200: #eed39a;
+  --color-honey-300: #e3b968;
+  --color-honey-400: #d89e3f;
+  --color-honey-500: #c98527;
+  --color-honey-600: #a9691e;
+  --color-honey-700: #855118;
+
+  /* Rust — errors. */
+  --color-rust-50: #f9ece8;
+  --color-rust-500: #b8492f;
+  --color-rust-600: #9c3a24;
+}
+
+/* ---------- motion ---------- */
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-msg-in {
+  animation: msg-in 0.26s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes window-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-window-in {
+  animation: window-in 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes teaser-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-teaser-in {
+  animation: teaser-in 0.35s ease-out both;
+}
+
+@keyframes launcher-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(42, 97, 71, 0.32);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(42, 97, 71, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(42, 97, 71, 0);
+  }
+}
+.launcher-ring {
+  animation: launcher-ring 2.6s ease-out infinite;
+}
+
+@keyframes dot-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+.typing-dot {
+  animation: dot-bounce 1.15s infinite;
+}
+
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.animate-soft-pulse {
+  animation: soft-pulse 1.8s ease-in-out infinite;
+}
+
+/* ---------- scrollbars ---------- */
+
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d5cfc0 transparent;
+}
+.chat-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: #d5cfc0;
+  border-radius: 999px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- base ---------- */
+
+::selection {
+  background: #dceae0;
+  color: #142e23;
+}
+
+html {
+  scroll-behavior: smooth;
+}
