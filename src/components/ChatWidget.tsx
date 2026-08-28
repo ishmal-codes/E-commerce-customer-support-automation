@@ -187,7 +187,7 @@ function HandoffBanner({ content }: { content: string }) {
 /* ------------------------------------------------------------------ */
 
 export default function ChatWidget() {
-  const [token] = useState(getToken);
+  const [token, setToken] = useState(getToken);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<WidgetMsg[]>([]);
   const [typing, setTyping] = useState(false);
@@ -444,6 +444,34 @@ export default function ChatWidget() {
     void request(lastFailedRef.current, false);
   };
 
+  /* start a fresh conversation: rotate the browser token so the backend
+     creates a new session, then reset all widget state */
+  const startNewConversation = useCallback(() => {
+    if (sendingRef.current || isSubmitting) return;
+    if (
+      escalated &&
+      !window.confirm(
+        "A human specialist is handling this conversation. Start a new conversation anyway?",
+      )
+    ) {
+      return;
+    }
+    const fresh = `s_${crypto.randomUUID()}`;
+    window.localStorage.setItem(TOKEN_KEY, fresh);
+    setToken(fresh);
+    setMessages([]);
+    setEscalated(false);
+    setEscalationRef(null);
+    setQuickReplies(GREETING_CHIPS);
+    setInput("");
+    setErrorText(null);
+    setTyping(false);
+    setUnread(0);
+    lastFailedRef.current = null;
+    append({ id: null, role: "assistant", content: GREETING, at: Date.now() });
+    inputRef.current?.focus();
+  }, [escalated, isSubmitting, append]);
+
   /* -------------------------------------------------------------- */
   /* render                                                          */
   /* -------------------------------------------------------------- */
@@ -477,6 +505,23 @@ export default function ChatWidget() {
                       : "Online — typically replies in seconds"}
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={startNewConversation}
+                  disabled={isSubmitting || typing}
+                  aria-label="Start new conversation"
+                  title="Start new conversation"
+                  className="grid size-8 place-items-center rounded-lg text-pine-200 transition hover:bg-pine-800 hover:text-cream disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M12 5v14M5 12h14"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
