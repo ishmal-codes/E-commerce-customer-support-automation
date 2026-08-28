@@ -48,7 +48,13 @@ export async function POST(req: NextRequest) {
     const res = await fetch(`${BACKEND_URL}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, sessionId }),
+      body: JSON.stringify({
+        message,
+        sessionId,
+        // DB-backed handoff state so the backend bot steps aside once a
+        // human has taken over the conversation.
+        escalated: session.escalated && session.escalationStatus === "open",
+      }),
       signal: controller.signal,
     });
     clearTimeout(timer);

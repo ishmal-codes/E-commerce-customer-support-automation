@@ -53,6 +53,23 @@ async function handleChat(req, res, next) {
     sessionService.getOrCreateSession(sessionId, { customerEmail });
     const history = sessionService.getHistory(sessionId);
 
+    // ── 2b. Already handed off? Bot steps aside; message goes to the care team ──
+    // `req.body.escalated` is the frontend's DB-backed handoff state (source of
+    // truth); the session metadata covers backend-only/standalone usage.
+    const meta = sessionService.getMetadata(sessionId);
+    const alreadyEscalated = req.body.escalated === true || Boolean(meta?.escalated);
+    if (alreadyEscalated) {
+      sessionService.addTurn(sessionId, 'user', userMessage);
+      return res.status(200).json({
+        sessionId,
+        response:
+          "Thanks — that's gone straight to the care team and they'll reply right here in the chat.",
+        escalated: true,
+        sourcesUsed: ['human_handoff'],
+        costMetrics: null,
+      });
+    }
+
     // ── 3. Pre-LLM escalation check (keyword scan) ─────────────────────────
     const preCheck = escalationService.detectEscalation(userMessage);
     if (preCheck.shouldEscalate) {
@@ -131,6 +148,12 @@ async function handleChat(req, res, next) {
 
     const isEscalated = postCheck.shouldEscalate;
     const escalationReason = postCheck.reason;
+
+    // Remember the handoff so subsequent messages skip the LLM (bot stays aside)
+    if (isEscalated && meta) {
+      meta.escalated = true;
+      meta.escalationReason = escalationReason;
+    }
 
     // ── 9. Persist turns to session ────────────────────────────────────────
     sessionService.addTurn(sessionId, 'user', userMessage);
