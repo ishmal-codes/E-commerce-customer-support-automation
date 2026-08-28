@@ -1,11 +1,15 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { chatSessions } from "@/db/schema";
+import { guardDeskRequest } from "@/lib/desk-auth";
 
 export const dynamic = "force-dynamic";
 
 /** POST /api/desk/resolve — mark an escalation as handled; the bot resumes. */
 export async function POST(req: Request) {
+  const denied = guardDeskRequest(req);
+  if (denied) return denied;
+
   let body: { sessionId?: unknown };
   try {
     body = (await req.json()) as typeof body;

@@ -2,11 +2,15 @@ import { asc, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { chatMessages, chatSessions } from "@/db/schema";
 import type { DeskResponse } from "@/lib/types";
+import { guardDeskRequest } from "@/lib/desk-auth";
 
 export const dynamic = "force-dynamic";
 
 /** GET /api/desk — the agent console's live queue + transcripts. */
-export async function GET() {
+export async function GET(req: Request) {
+  const denied = guardDeskRequest(req);
+  if (denied) return denied;
+
   try {
     const sessions = await db
       .select()

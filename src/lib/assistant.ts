@@ -34,17 +34,19 @@ const STATUS_RE =
   /\b(track|tracking|status|where)\b.*\b(order|package|parcel|item|it)\b|\border\b.*\b(status|track|where|when|coming|arrive)\b|\bwhere'?s my\b/i;
 const STOCK_RE = /\b(in stock|available|availability|inventory|restock|stock)\b/i;
 const GENERIC_PRODUCT_RE =
-  /\b(products?|what do you (sell|have)|catalog(ue)?|collection|recommend|materials?|care instructions?|dimensions?|sizes?)\b/i;
+  /\b(products?|what do you (sell|have)|catalog(ue)?|collection|recommend|iphones? lineup|specs?|features?)\b/i;
 const CONTACT_RE = /\b(hours?|contact|phone|email|address|reach you)\b/i;
 
 const BASE_CHIPS = ["Track my order", "Shipping times", "Returns & refunds"];
 
 function parseOrderNumber(text: string, context: SessionContext): string | null {
-  const prefixed = text.match(/\b(?:tv|order)\s*#?\s*-?\s*(\d{3,6})\b/i) ?? text.match(/#\s*(?:tv\s*-?\s*)?(\d{3,6})\b/i);
-  if (prefixed?.[1]) return `TV-${prefixed[1]}`;
+  const hashMatch = text.match(/#\s*(\d{3,6})\b/);
+  if (hashMatch?.[1]) return `#${hashMatch[1]}`;
+  const wordMatch = text.match(/\border\s*#?\s*-?\s*(\d{3,6})\b/i);
+  if (wordMatch?.[1]) return `#${wordMatch[1]}`;
   const bare = text.match(/\b(\d{3,6})\b/);
   if (bare?.[1] && (context.awaiting === "order_number" || /\border\b/i.test(text))) {
-    return `TV-${bare[1]}`;
+    return `#${bare[1]}`;
   }
   return null;
 }
@@ -139,7 +141,7 @@ async function resolveOrder(
   if (!order) {
     await updateContext(session, { awaiting: null, awaitingReason: null });
     return {
-      response: `I couldn't match ${orderNumber} to an order in this store. Double-check the number (it looks like TV-1042), or I can hand you to the care team to look it up manually.`,
+      response: `I couldn't match ${orderNumber} to an order in this store. Double-check the number (it looks like #10234), or I can hand you to the care team to look it up manually.`,
       quickReplies: ["Talk to a human", ...BASE_CHIPS],
       orderCard: null,
       handoffJustHappened: false,
@@ -154,7 +156,7 @@ async function resolveOrder(
   if (wantsReturn) {
     if (order.status === "delivered") {
       return {
-        response: `Order ${order.orderNumber} was delivered ${order.eta ?? "recently"}, so you're inside the 30-day return window. Returns are free — in the full setup I'd generate the return label right here in the chat.`,
+        response: `Order ${order.orderNumber} was delivered ${order.eta ?? "recently"}, so you're inside the 14-day return window. Just make sure the device is in its original condition with Apple ID signed out and Find My iPhone disabled. I can start the return process for you, or connect you with the care team.`,
         quickReplies: ["That's all, thanks", "Shipping times"],
         orderCard: card,
         handoffJustHappened: false,
@@ -162,7 +164,7 @@ async function resolveOrder(
     }
     if (order.status === "in_transit") {
       return {
-        response: `Order ${order.orderNumber} is still on its way (${order.eta ?? "ETA soon"}). You can start a return as soon as it's delivered — the window is 30 days from that date.`,
+        response: `Order ${order.orderNumber} is still on its way (${order.eta ?? "ETA soon"}). You can start a return within 14 calendar days of delivery — once it arrives, I can help you get that going.`,
         quickReplies: ["Track my order", "That's all, thanks"],
         orderCard: card,
         handoffJustHappened: false,
@@ -254,7 +256,7 @@ export async function runAssistant(
   if (GREETING_RE.test(text) && text.length < 40) {
     return {
       response:
-        "Hi! I'm Aurel's support assistant. I can look up order status, explain shipping and returns, or answer product questions — all from the store's live data. What can I check for you?",
+        "Hi! I'm Trevolk's support assistant. I can look up order status, explain shipping and returns, or answer product questions — all from the store's live data. What can I check for you?",
       quickReplies: ["Track my order", "Shipping times", "Returns & refunds", "Product questions"],
       orderCard: null,
       handoffJustHappened: false,
@@ -289,8 +291,8 @@ export async function runAssistant(
     await updateContext(session, { awaiting: null, awaitingReason: null });
     return {
       response:
-        "No worries — whenever you have it, your order number looks like TV-1042 (it's in your confirmation email). Or pick one of the demo orders below.",
-      quickReplies: ["TV-1042", "TV-1051", "TV-1038", "Talk to a human"],
+        "No worries — whenever you have it, your order number looks like #10234 (it's in your confirmation email). Or pick one of the demo orders below.",
+      quickReplies: ["#10234", "#10240", "#10246", "Talk to a human"],
       orderCard: null,
       handoffJustHappened: false,
     };
@@ -301,7 +303,7 @@ export async function runAssistant(
     await updateContext(session, { awaiting: "order_number", awaitingReason: "return" });
     return {
       response: "Happy to check that. What's the order number?",
-      quickReplies: ["TV-1042", "TV-1051", "TV-1038"],
+      quickReplies: ["#10234", "#10240", "#10246"],
       orderCard: null,
       handoffJustHappened: false,
     };
@@ -332,8 +334,8 @@ export async function runAssistant(
     await updateContext(session, { awaiting: "order_number", awaitingReason: "status", fallbackCount: 0 });
     return {
       response:
-        "Let me look that up. What's the order number? It looks like TV-1042 and it's in your confirmation email — or pick a demo order below.",
-      quickReplies: ["TV-1042", "TV-1051", "TV-1038"],
+        "Let me look that up. What's the order number? It looks like #10234 and it's in your confirmation email — or pick a demo order below.",
+      quickReplies: ["#10234", "#10240", "#10246"],
       orderCard: null,
       handoffJustHappened: false,
     };
@@ -374,10 +376,9 @@ export async function runAssistant(
   }
   if (GENERIC_PRODUCT_RE.test(text)) {
     await updateContext(session, { fallbackCount: 0 });
-    const names = PRODUCTS.map((p) => p.name);
     return {
-      response: `Right now the collection is four pieces: ${names[0]}, ${names[1]}, ${names[2]} and ${names[3]}. Ask me about any of them — materials, care, dimensions — and I'll pull the details from the catalog.`,
-      quickReplies: names,
+      response: "We carry 9 iPhone models from $349 to $1,149 — including iPhone 15, 15 Pro, 15 Pro Max, 14, 14 Plus, and SE — plus AirPods, MagSafe cases, chargers and cables. Ask me about any specific model and I'll pull the full specs from the catalog.",
+      quickReplies: ["iPhone 15 Pro", "iPhone SE", "AirPods", "Accessories"],
       orderCard: null,
       handoffJustHappened: false,
     };
@@ -388,7 +389,7 @@ export async function runAssistant(
     await updateContext(session, { fallbackCount: 0 });
     return {
       response:
-        "The care team answers here in this chat every day 9:00–18:00 CET. Email works too — care@aurelhome.shop — with a reply within one business day. If it's about an order, chatting here is fastest.",
+        "The care team answers here in this chat every day 9:00–18:00. Email works too — support@trevolk.shop — with a reply within one business day. If it's about an order, chatting here is fastest.",
       quickReplies: ["Track my order", "Talk to a human"],
       orderCard: null,
       handoffJustHappened: false,

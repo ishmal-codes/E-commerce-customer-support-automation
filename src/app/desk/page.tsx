@@ -6,6 +6,8 @@ import type { DeskResponse } from "@/lib/types";
 
 type Selected = DeskResponse["sessions"][number] | null;
 
+const DESK_SECRET_KEY = "trevolk-desk-secret";
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -21,6 +23,9 @@ function formatClock(iso: string) {
 }
 
 export default function DeskPage() {
+  const [secret, setSecret] = useState<string | null>(null);
+  const [loginInput, setLoginInput] = useState("");
+  const [loginError, setLoginError] = useState(false);
   const [data, setData] = useState<DeskResponse | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
@@ -28,9 +33,44 @@ export default function DeskPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
 
+  // Restore stored secret on mount
+  useEffect(() => {
+    const stored = window.localStorage.getItem(DESK_SECRET_KEY);
+    if (stored) setSecret(stored);
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = loginInput.trim();
+    if (!val) return;
+    window.localStorage.setItem(DESK_SECRET_KEY, val);
+    setSecret(val);
+    setLoginInput("");
+    setLoginError(false);
+  };
+
+  const logout = () => {
+    window.localStorage.removeItem(DESK_SECRET_KEY);
+    setSecret(null);
+    setData(null);
+  };
+
+  const authHeaders = useCallback(
+    (extra?: Record<string, string>) => ({
+      ...extra,
+      "x-desk-secret": secret ?? "",
+    }),
+    [secret],
+  );
+
   const load = useCallback(async () => {
+    if (!secret) return;
     try {
-      const res = await fetch("/api/desk", { cache: "no-store" });
+      const res = await fetch("/api/desk", {
+        cache: "no-store",
+        headers: authHeaders(),
+      });
+      if (res.status === 401) { logout(); setLoginError(true); return; }
       if (!res.ok) return;
       const next = (await res.json()) as DeskResponse;
       setData(next);
@@ -42,16 +82,43 @@ export default function DeskPage() {
     } catch {
       /* keep showing stale data */
     }
+  }, [secret, authHeaders]);
+
+  // Smart polling — pauses when tab hidden, slows to 10 s when idle
+  const [isVisible, setIsVisible] = useState(true);
+  const lastActivityRef = useRef(Date.now());
+  const [isIdle, setIsIdle] = useState(false);
+
+  useEffect(() => {
+    const onVis = () => setIsVisible(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    const bump = () => { lastActivityRef.current = Date.now(); setIsIdle(false); };
+    window.addEventListener("mousemove", bump, { passive: true });
+    window.addEventListener("keydown", bump, { passive: true });
+    window.addEventListener("touchstart", bump, { passive: true });
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("mousemove", bump);
+      window.removeEventListener("keydown", bump);
+      window.removeEventListener("touchstart", bump);
+    };
   }, []);
 
   useEffect(() => {
-    const fetchInitial = () => {
-      void load();
-    };
-    fetchInitial();
-    const t = window.setInterval(() => void load(), 3000);
+    if (!isVisible) return;
+    const id = window.setInterval(() => {
+      if (Date.now() - lastActivityRef.current > 30_000) setIsIdle(true);
+    }, 5_000);
+    return () => window.clearInterval(id);
+  }, [isVisible]);
+
+  const pollMs = isIdle ? 10_000 : 3_000;
+  useEffect(() => {
+    if (!isVisible) return;
+    void load();
+    const t = window.setInterval(() => void load(), pollMs);
     return () => window.clearInterval(t);
-  }, [load]);
+  }, [load, isVisible, pollMs]);
 
   const selected: Selected =
     data?.sessions.find((s) => s.sessionId === selectedId) ?? null;
@@ -67,9 +134,10 @@ export default function DeskPage() {
     try {
       const res = await fetch("/api/desk/reply", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ sessionId: selected.sessionId, message: text }),
       });
+      if (res.status === 401) { logout(); return; }
       if (!res.ok) throw new Error("reply failed");
       setDraft("");
       await load();
@@ -84,11 +152,12 @@ export default function DeskPage() {
   const resolve = async () => {
     if (!selected) return;
     try {
-      await fetch("/api/desk/resolve", {
+      const res = await fetch("/api/desk/resolve", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ sessionId: selected.sessionId }),
       });
+      if (res.status === 401) { logout(); return; }
       await load();
     } catch {
       setNotice("Could not resolve — try again.");
@@ -97,6 +166,52 @@ export default function DeskPage() {
   };
 
   const canReply = selected?.escalated && selected.escalationStatus === "open";
+
+  // ── Login gate ──────────────────────────────────────────────────────────
+  if (!secret) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-pine-950 text-pine-100">
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-sm rounded-2xl border border-pine-800 bg-pine-900/40 p-8 shadow-xl"
+        >
+          <div className="mb-6 text-center">
+            <span className="mx-auto mb-3 grid size-12 place-items-center rounded-xl bg-pine-700 text-cream">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </span>
+            <p className="font-display text-lg font-bold text-cream">Trevolk Desk</p>
+            <p className="mt-1 text-xs text-pine-300">Enter the desk password to continue</p>
+          </div>
+          <input
+            type="password"
+            value={loginInput}
+            onChange={(e) => { setLoginInput(e.target.value); setLoginError(false); }}
+            placeholder="Desk password"
+            autoFocus
+            className="mb-3 w-full rounded-lg border border-pine-700 bg-pine-900/60 px-4 py-3 text-sm text-cream placeholder:text-pine-400 focus:border-pine-400 focus:ring-2 focus:ring-pine-400/25 focus:outline-none"
+          />
+          {loginError && (
+            <p className="mb-3 text-xs text-rust-500">Wrong password — try again.</p>
+          )}
+          <button
+            type="submit"
+            disabled={!loginInput.trim()}
+            className="w-full rounded-lg bg-honey-400 py-3 text-sm font-bold text-pine-950 transition hover:bg-honey-300 disabled:opacity-40"
+          >
+            Unlock desk
+          </button>
+          <p className="mt-4 text-center">
+            <Link href="/" className="text-xs text-pine-400 transition hover:text-pine-200">
+              ← Back to storefront
+            </Link>
+          </p>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-pine-950 text-pine-100">
@@ -133,6 +248,14 @@ export default function DeskPage() {
             >
               Open storefront ↗
             </Link>
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-lg border border-pine-700 px-3 py-1.5 text-xs font-semibold text-pine-300 transition hover:border-pine-500 hover:text-cream"
+              title="Lock the desk"
+            >
+              🔒 Lock
+            </button>
           </div>
         </div>
       </header>

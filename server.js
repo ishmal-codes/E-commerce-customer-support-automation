@@ -67,7 +67,7 @@ app.use('/api', chatRoutes);
 // Root ping (useful for Railway's health check URL)
 app.get('/', (req, res) => {
   res.json({
-    service: 'Trevolk Apple Store — Customer Support Chatbot API',
+    service: `${config.store.name} — Customer Support Chatbot API`,
     version: require('./package.json').version,
     status: 'running',
     docs: 'POST /api/chat | GET /api/health',

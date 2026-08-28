@@ -12,6 +12,13 @@ if (process.env.NODE_ENV !== 'production') {
  * Every env var the app needs lives here — no process.env scattered through code.
  */
 const config = {
+  // ── Store identity ──────────────────────────────────────────────────────
+  store: {
+    name: process.env.STORE_NAME || 'Trevolk Apple Store',
+    shortName: process.env.STORE_SHORT_NAME || 'Trevolk',
+    supportEmail: process.env.STORE_SUPPORT_EMAIL || 'support@trevolk.shop',
+  },
+
   // ── Server ─────────────────────────────────────────────────────────────
   port: parseInt(process.env.BACKEND_PORT || process.env.PORT, 10) || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -72,6 +79,11 @@ const config = {
   session: {
     maxTurns: parseInt(process.env.SESSION_MAX_TURNS, 10) || 20,
     ttlMs: parseInt(process.env.SESSION_TTL_MS, 10) || 1_800_000, // 30 min
+  },
+
+  // ── Agent desk console ──────────────────────────────────────────────
+  desk: {
+    secret: process.env.DESK_SECRET || 'trevolk2026',
   },
 
   // ── Paths ──────────────────────────────────────────────────────────────

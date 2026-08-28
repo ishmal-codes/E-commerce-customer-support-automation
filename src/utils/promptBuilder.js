@@ -1,5 +1,7 @@
 'use strict';
 
+const config = require('../config');
+
 /**
  * promptBuilder.js
  * Assembles the full system prompt and user-facing conversation context
@@ -12,8 +14,8 @@
  *  4. Conversation history provides context continuity.
  */
 
-const STORE_NAME = 'Trevolk Apple Store';
-const STORE_URL = 'https://trevolk-apple-demo.myshopify.com';
+const STORE_NAME = config.store.name;
+const STORE_URL = `https://${config.shopify.storeDomain}`;
 
 /**
  * Build the static system prompt.

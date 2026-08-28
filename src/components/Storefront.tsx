@@ -11,30 +11,33 @@ function formatPrice(n: number) {
   return `$${n.toFixed(0)}`;
 }
 
- const getImage = (id: string, fallback?: string) => {
-  const cleanId = (id || '').toLowerCase();
-  
-  if (cleanId.includes('candle') || cleanId === '1') 
-    return "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=800&q=80&v=3";
-    
-  if (cleanId.includes('throw') || cleanId.includes('linen') || cleanId === '2') 
-    return "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?auto=format&fit=crop&w=800&q=80&v=3";
-    
-  if (cleanId.includes('mug') || cleanId === '3') 
-    return "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=800&q=80&v=3";
-    
-  if (cleanId.includes('board') || cleanId === '4') 
-    return "https://images.unsplash.com/photo-1590794056226-79ef3a8147e1?auto=format&fit=crop&w=800&q=80&v=3";
-    
-  return fallback || "";
+const getImage = (id: string, fallback?: string) => {
+  const cleanId = (id || "").toLowerCase();
+
+  if (cleanId.includes("airpods-pro"))
+    return "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?auto=format&fit=crop&w=800&q=80";
+
+  if (cleanId.includes("airpods"))
+    return "https://images.unsplash.com/photo-1588423771073-b8903fbb85b5?auto=format&fit=crop&w=800&q=80";
+
+  if (cleanId.includes("case") || cleanId.includes("magsafe"))
+    return "https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?auto=format&fit=crop&w=800&q=80";
+
+  if (cleanId.includes("charger") || cleanId.includes("adapter") || cleanId.includes("cable") || cleanId.includes("lightning"))
+    return "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=800&q=80";
+
+  if (cleanId.includes("iphone"))
+    return "https://images.unsplash.com/photo-1591337676887-a217a6970a8a?auto=format&fit=crop&w=800&q=80";
+
+  return fallback || "https://images.unsplash.com/photo-1591337676887-a217a6970a8a?auto=format&fit=crop&w=800&q=80";
 };
 
 const DEMO_PROMPTS = [
-  { q: "Where is my order TV-1042?", note: "live order lookup" },
+  { q: "Where is my order #10240?", note: "live order lookup" },
   { q: "How long does shipping take?", note: "policy answer" },
-  { q: "How do I care for the linen throw?", note: "product data" },
-  { q: "Do you restock the throw in charcoal?", note: "honest fallback" },
-  { q: "Talk to a human", note: "live handoff → then open /desk" },
+  { q: "What are the specs of the iPhone 15 Pro?", note: "product data" },
+  { q: "Can I return my iPhone after activating it?", note: "FAQ answer" },
+  { q: "Talk to a human", note: "live handoff \u2192 then open /desk" },
 ];
 
 export default function Storefront() {
@@ -52,7 +55,7 @@ export default function Storefront() {
     <div className="min-h-dvh">
       {/* announcement bar */}
       <div className="bg-pine-900 px-4 py-2 text-center text-[11px] font-medium tracking-wide text-pine-100">
-        Free standard shipping over $75 · 30-day returns · Support answers in seconds
+        Free standard shipping over $500 · 14-day returns · AI support answers in seconds
       </div>
 
       {/* header */}
@@ -67,12 +70,12 @@ export default function Storefront() {
                 />
               </svg>
             </span>
-            <span className="font-display text-lg font-bold tracking-tight">Aurel Home</span>
+            <span className="font-display text-lg font-bold tracking-tight">Trevolk</span>
           </a>
           <nav className="hidden items-center gap-5 text-sm font-medium text-ink-soft md:flex">
-            <a href="#shop" className="transition hover:text-ink">Shop</a>
-            <a href="#shop" className="transition hover:text-ink">Collections</a>
-            <a href="#values" className="transition hover:text-ink">Our promise</a>
+            <a href="#shop" className="transition hover:text-ink">iPhones</a>
+            <a href="#shop" className="transition hover:text-ink">Accessories</a>
+            <a href="#values" className="transition hover:text-ink">Why Trevolk</a>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <button
@@ -118,14 +121,14 @@ export default function Storefront() {
       <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 pt-12 pb-14 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-12">
         <div>
           <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-honey-200 bg-honey-50 px-3 py-1 text-[11px] font-bold tracking-wide text-honey-700">
-            NEW BATCH · POURED 4 JUNE
+            AUTHORIZED APPLE RESELLER
           </p>
           <h1 className="font-display text-4xl leading-[1.08] font-bold tracking-tight sm:text-5xl">
-            Objects for slower living.
+            The latest iPhones &amp; Apple accessories.
           </h1>
           <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-soft">
-            Small-batch home goods — poured, woven and turned by hand. Made to be used daily and
-            kept for years, with support that actually answers.
+            Genuine Apple products with real-time order tracking, shipping updates and instant answers
+            to your product questions — all powered by AI support.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <a
@@ -151,8 +154,8 @@ export default function Storefront() {
           <div className="overflow-hidden rounded-xl border border-line shadow-[0_20px_50px_-20px_rgba(20,46,35,0.35)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&q=80"
-              alt="Styled shelf with Aurel Home candles, linen throw and stoneware"
+              src="https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=1200&q=80"
+              alt="iPhone with wireless earbuds on a wooden surface against a deep green background"
               className="aspect-[4/3] w-full object-cover"
               loading="eager"
             />
@@ -169,13 +172,13 @@ export default function Storefront() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="mb-8 flex items-end justify-between">
             <div>
-              <h2 className="font-display text-2xl font-bold tracking-tight">The collection</h2>
+              <h2 className="font-display text-2xl font-bold tracking-tight">Shop iPhones &amp; accessories</h2>
               <p className="mt-1 text-sm text-ink-soft">
-                Four pieces. Ask the assistant about any of them.
+                Browse the full Apple catalog. Ask the assistant about any product.
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {PRODUCTS.map((p) => (
               <article
                 key={p.id}
@@ -223,12 +226,12 @@ export default function Storefront() {
         <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:grid-cols-3 sm:px-6">
           {[
             {
-              title: "Free shipping over $75",
-              body: "3–5 business days standard, express in 1–2. Out the same day before 3pm CET.",
+              title: "Free standard shipping over $500",
+              body: "Domestic standard $9.99 (3–5 days), express $19.99 (1–2 days). Orders processed within 1–2 business days.",
             },
             {
-              title: "30-day returns",
-              body: "Free return labels, refunds in 3–5 business days. Start one right in the chat.",
+              title: "14-day returns",
+              body: "Return within 14 calendar days in original condition. Refunds issued within 5–7 business days after inspection.",
             },
             {
               title: "Support that answers",
@@ -247,10 +250,10 @@ export default function Storefront() {
       <footer className="border-t border-line bg-pine-950 py-10 text-pine-200">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 sm:px-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="font-display text-sm font-bold text-cream">Aurel Home</p>
+            <p className="font-display text-sm font-bold text-cream">Trevolk</p>
             <p className="mt-1 max-w-md text-xs leading-relaxed text-pine-300">
-              A demo storefront for the Trevolk support automation. Order data is sample data —
-              try TV-1042, TV-1051 or TV-1038 in the chat.
+              A demo Apple storefront for the Trevolk support automation. Order data is sample —
+              try #10234, #10240 or #10246 in the chat.
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs">

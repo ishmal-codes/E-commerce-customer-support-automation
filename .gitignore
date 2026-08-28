@@ -3,7 +3,8 @@ node_modules/
 
 # ── Environment secrets ─────────────────────────
 .env
-.txt
+.env*.local
+*.pem
 
 # ── Logs ────────────────────────────────────────
 logs/
@@ -19,3 +20,12 @@ Thumbs.db
 # ── Build artifacts ──────────────────────────────
 dist/
 build/
+.next/
+tsconfig.tsbuildinfo
+coverage/
+.vercel
+
+# ── Internal planning docs ──────────────────────
+docs/Frontend_Plan_Ishmal.md
+docs/Backend_Plan_Musa.md
+Backend_Plan_Musa

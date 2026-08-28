@@ -16,9 +16,9 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Aurel Home — Objects for slower living",
+  title: "Trevolk — Apple Smartphones, Accessories & Support",
   description:
-    "Demo storefront for the Trevolk support automation. Ask the chat about an order, shipping or returns — or ask for a human and watch the handoff.",
+    "Demo Apple storefront powered by Trevolk support automation. Ask the chat about an order, shipping, returns or products — or ask for a human and watch the handoff.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

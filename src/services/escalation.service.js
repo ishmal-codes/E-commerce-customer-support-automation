@@ -141,7 +141,7 @@ async function _sendDiscordNotification({ sessionId, preview, reason, customerEm
       { name: 'Escalation Reason', value: reason, inline: false },
       { name: 'Customer Message', value: `> ${preview}`, inline: false },
     ],
-    footer: { text: 'Trevolk Apple Store — Support Bot' },
+    footer: { text: `${config.store.name} — Support Bot` },
   };
 
   await axios.post(config.escalation.discord.webhookUrl, { embeds: [embed] }, { timeout: 5000 });
@@ -183,11 +183,11 @@ async function _sendEmailNotification({
     <h3>Customer Message</h3>
     <blockquote style="border-left:4px solid #d32f2f;padding:8px 12px;background:#fff3f3">${userMessage}</blockquote>
     ${llmResponse ? `<h3>Bot's Draft Response</h3><blockquote style="border-left:4px solid #888;padding:8px 12px">${llmResponse}</blockquote>` : ''}
-    <p style="color:#666;font-size:12px">— Trevolk Apple Store Support Bot</p>
+    <p style="color:#666;font-size:12px">— ${config.store.name} Support Bot</p>
   `;
 
   await transporter.sendMail({
-    from: `"Trevolk Support Bot" <${config.escalation.email.fromEmail}>`,
+    from: `"${config.store.shortName} Support Bot" <${config.escalation.email.fromEmail}>`,
     to: recipients,
     subject: `[ESCALATION] Customer Support Required — Session ${sessionId}`,
     html,

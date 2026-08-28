@@ -20,7 +20,7 @@ type WidgetMsg = {
 
 const TOKEN_KEY = "trevolk-session-token";
 const GREETING =
-  "Hi! I'm Aurel's support assistant. I can look up order status, explain shipping and returns, or answer product questions — all from the store's live data. What can I check for you?";
+  "Hi! I'm Trevolk's support assistant. I can look up order status, explain shipping and returns, or answer product questions — all from the store's live data. What can I check for you?";
 const GREETING_CHIPS = ["Track my order", "Shipping times", "Returns & refunds", "Product questions"];
 
 function getToken(): string {
@@ -340,11 +340,41 @@ export default function ChatWidget() {
     }
   }, [token]);
 
+  /* smart poll for agent replies — pauses when tab hidden, slows to 10 s when idle */
+  const [isVisible, setIsVisible] = useState(true);
+  const lastActivityRef = useRef(Date.now());
+  const [isIdle, setIsIdle] = useState(false);
+
   useEffect(() => {
-    if (!open) return;
-    const t = window.setInterval(() => void pull(), 4000);
+    const onVis = () => setIsVisible(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    const bump = () => { lastActivityRef.current = Date.now(); setIsIdle(false); };
+    window.addEventListener("mousemove", bump, { passive: true });
+    window.addEventListener("keydown", bump, { passive: true });
+    window.addEventListener("touchstart", bump, { passive: true });
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("mousemove", bump);
+      window.removeEventListener("keydown", bump);
+      window.removeEventListener("touchstart", bump);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    const id = window.setInterval(() => {
+      if (Date.now() - lastActivityRef.current > 30_000) setIsIdle(true);
+    }, 5_000);
+    return () => window.clearInterval(id);
+  }, [isVisible]);
+
+  const pollMs = isIdle ? 10_000 : 4_000;
+  useEffect(() => {
+    if (!open || !isVisible) return;
+    void pull();
+    const t = window.setInterval(() => void pull(), pollMs);
     return () => window.clearInterval(t);
-  }, [open, pull]);
+  }, [open, isVisible, pollMs, pull]);
 
   /* the actual request; separated so Retry can re-run without duplicating */
   const request = useCallback(
@@ -423,7 +453,7 @@ export default function ChatWidget() {
       {/* chat window */}
       {open && (
         <section
-          aria-label="Aurel support chat"
+          aria-label="Trevolk support chat"
           className="animate-window-in fixed inset-0 z-50 flex sm:inset-auto sm:right-5 sm:bottom-[92px] sm:h-[min(640px,calc(100dvh-120px))] sm:w-[396px]"
         >
           <div className="flex h-full w-full flex-col overflow-hidden border border-line bg-paper shadow-[0_24px_60px_-16px_rgba(20,46,35,0.35)] sm:rounded-xl">
@@ -435,7 +465,7 @@ export default function ChatWidget() {
                   <AgentAvatar />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-display text-sm font-semibold leading-tight">Aurel Care</p>
+                  <p className="font-display text-sm font-semibold leading-tight">Trevolk Care</p>
                   <p className="flex items-center gap-1.5 text-[11px] text-pine-200">
                     <span
                       className={`inline-block size-1.5 rounded-full ${
@@ -650,7 +680,7 @@ export default function ChatWidget() {
             </button>
             <p className="text-[12px] leading-snug text-ink">
               <span className="font-semibold">Questions about an order?</span> I can look it up in
-              seconds — try <span className="font-semibold">TV-1042</span>.
+              seconds — try <span className="font-semibold">#10240</span>.
             </p>
           </div>
         </div>

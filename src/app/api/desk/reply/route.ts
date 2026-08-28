@@ -1,9 +1,13 @@
 import { appendMessage } from "@/lib/chat-store";
+import { guardDeskRequest } from "@/lib/desk-auth";
 
 export const dynamic = "force-dynamic";
 
 /** POST /api/desk/reply — an agent's reply appears in the customer's widget. */
 export async function POST(req: Request) {
+  const denied = guardDeskRequest(req);
+  if (denied) return denied;
+
   let body: { sessionId?: unknown; message?: unknown };
   try {
     body = (await req.json()) as typeof body;
