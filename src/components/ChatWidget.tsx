@@ -572,7 +572,7 @@ export default function ChatWidget() {
                   return (
                     <div key={m.key} className="animate-msg-in flex justify-end">
                       <div className="max-w-[82%]">
-                        <div className="rounded-xl rounded-br-sm bg-pine-700 px-3.5 py-2.5 text-[13px] leading-relaxed text-cream">
+                        <div className="whitespace-pre-line rounded-xl rounded-br-sm bg-pine-700 px-3.5 py-2.5 text-[13px] leading-relaxed text-cream">
                           {m.content}
                         </div>
                         <p className="mt-1 text-right text-[10px] text-ink-soft">{formatTime(m.at)}</p>
@@ -592,7 +592,7 @@ export default function ChatWidget() {
                         </p>
                       )}
                       <div
-                        className={`rounded-xl rounded-bl-sm px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                        className={`whitespace-pre-line rounded-xl rounded-bl-sm px-3.5 py-2.5 text-[13px] leading-relaxed ${
                           isAgent
                             ? "border border-honey-200 bg-honey-50 text-ink"
                             : "border border-line bg-cream text-ink"

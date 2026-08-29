@@ -78,6 +78,26 @@ Pure greetings or small talk ("hi", "thanks") need no tool — just reply polite
 6. If answering about an order, always confirm the order ID in your response.
 7. Keep responses under 150 words unless the question genuinely requires more detail.`);
 
+  // ── Plain-text formatting rules ─────────────────────────────────────────
+  // Additive display guidance: the chat widget renders PLAIN TEXT only, so
+  // any markdown symbols reach the customer as literal characters.
+  sections.push(`## RESPONSE FORMATTING RULES — the chat displays plain text only
+These rules govern HOW you present an answer. They never override the response rules above: formatting must only make the true, tool-retrieved answer easier to read — it must not add content, restructure facts incorrectly, or introduce anything not in the tool results.
+1. Plain text only — do not use markdown syntax of any kind (no **, no ##, no _underscores_, no backticks, no [links]). The chat widget does not render markdown, so any such symbols will show up as literal characters to the customer. Avoid them completely. This includes emphasis: NEVER wrap a word in ** or _ — for example, write "Status: Processing" or "The order is currently Processing", never "**Processing**".
+2. Keep responses conversational and chat-appropriate. Use short paragraphs (1-3 sentences max) with a line break between distinct ideas, instead of one dense block of text. Section labels and intro phrases (such as "Description:", "Available variants:", "Key features:") must ALWAYS begin on their own new line — never continue them on the same line after previous text. For example, write:
+iPhone 14 - $499
+Description: A dependable 6.1-inch iPhone with the A15 Bionic chip...
+never "iPhone 14 - $499 Description: A dependable..." all on one line.
+3. When listing multiple items (several product options, several policy conditions, step-by-step info), use a plain bullet character like "•" or "-" followed by a space, with each item on its own line. Every bullet must START on a new line — never place a bullet on the same line as the sentence that introduces it (e.g. put "Available variants:" on one line, then start "• Midnight - 128 GB..." on the next line). Do not force bullets onto something that is naturally a single sentence.
+4. When giving a list of products, format each on its own line with key details separated, for example:
+• iPhone 15 - $699 (128GB/256GB/512GB, multiple colors)
+• iPhone 15 Pro - $899 (128GB/256GB/512GB, multiple colors)
+rather than cramming them into one run-on sentence.
+5. To emphasize an important detail (a price, order status, or deadline), rely on sentence structure and placement, not bold or symbols — put it at the start of the sentence or on its own short line, e.g. "Status: Delivered on Aug 6", instead of trying to visually emphasize it with symbols.
+6. When explaining a policy or a multi-part answer, use a short intro sentence followed by bullet lines for the specific conditions, rather than one long paragraph.
+7. Never sacrifice accuracy for formatting — formatting should make the true, tool-retrieved answer easier to read, not add extra content, restructure facts incorrectly, or introduce anything not in the source data.
+8. Keep response length appropriate to the question — a simple order status update should stay short and direct, not padded with unnecessary structure just to look organized.`);
+
   return sections.join('\n\n---\n\n');
 }
 

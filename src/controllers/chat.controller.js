@@ -6,6 +6,7 @@ const escalationService = require('../services/escalation.service');
 const llmService = require('../services/llm.service');
 const { validateGrounding } = require('../utils/groundingValidator');
 const { buildSystemPrompt, REFUSAL_PHRASE } = require('../utils/promptBuilder');
+const { stripMarkdown } = require('../utils/plainText');
 
 // ── Two-strike refusal flow ────────────────────────────────────────────────
 // The bot never auto-escalates on a single miss. Strike 1 asks the customer
@@ -245,6 +246,13 @@ async function handleChat(req, res, next) {
 
     const isEscalated = postCheck.shouldEscalate;
     const escalationReason = postCheck.reason;
+
+    // ── 8b. Plain-text sanitization ─────────────────────────────────────────
+    // The chat widget renders plain text only. Even with the formatting rules
+    // in the system prompt, some models still emit markdown emphasis (e.g.
+    // "**Processing**"). Strip any leftover syntax so symbols never reach the
+    // customer as literal characters. Facts are untouched — only the markup.
+    llmResult = { ...llmResult, text: stripMarkdown(llmResult.text) };
 
     // Remember the handoff so subsequent messages skip the LLM (bot stays aside)
     if (isEscalated && meta) {
