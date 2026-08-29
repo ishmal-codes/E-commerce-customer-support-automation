@@ -3,10 +3,6 @@ import { db } from "@/db";
 import { chatMessages, chatSessions, type ChatSession } from "@/db/schema";
 import type { TranscriptResponse } from "@/lib/types";
 
-export function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // In-memory fallback stores when database is unreachable
 const memorySessions = new Map<string, ChatSession>();
 const memoryMessages = new Map<

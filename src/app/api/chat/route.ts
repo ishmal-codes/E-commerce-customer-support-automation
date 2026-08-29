@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { chatSessions } from "@/db/schema";
 import { ensureSeeded } from "@/db/seed";
-import { runAssistant } from "@/lib/assistant";
-import { appendMessage, buildTranscript, getOrCreateSession, sleep } from "@/lib/chat-store";
+import { appendMessage, buildTranscript, getOrCreateSession } from "@/lib/chat-store";
 import type { ChatResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +46,10 @@ export async function POST(req: NextRequest) {
   // 2. Try calling Express backend server if running
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
+    // The backend runs an agentic tool loop (LLM ↔ tools, up to 4 rounds)
+    // which can legitimately take ~5–40s. A short timeout here would abort
+    // valid answers. A dead backend still fails fast (connection refused).
+    const timer = setTimeout(() => controller.abort(), 65_000);
     const res = await fetch(`${BACKEND_URL}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -76,21 +81,45 @@ export async function POST(req: NextRequest) {
           session.escalated = true;
           session.escalationRef = `ESC-${1000 + session.id}`;
           session.escalationStatus = "open";
+          // Persist the handoff so it is only announced ONCE. Without this the
+          // DB row stays unescalated, every turn re-detects the transition and
+          // the "Human handoff" banner repeats on every message.
+          try {
+            await db
+              .update(chatSessions)
+              .set({
+                escalated: true,
+                escalationRef: session.escalationRef,
+                escalationReason: "Backend bot escalated the conversation",
+                escalationStatus: "open",
+              })
+              .where(eq(chatSessions.id, session.id));
+          } catch {
+            // Database offline — in-memory state still covers this process.
+          }
         }
 
         await appendMessage(session.id, "assistant", responseText);
+
+        const backendChips =
+          data && Array.isArray(data.quickReplies)
+            ? data.quickReplies.filter((c: unknown): c is string => typeof c === "string" && c.trim().length > 0)
+            : [];
 
         const payload: ChatResponse = {
           response: responseText,
           escalated,
           handoffJustHappened,
           escalationRef: session.escalationRef ?? null,
-          quickReplies: [
-            "Track my order",
-            "Shipping times",
-            "Returns & refunds",
-            "Talk to a human",
-          ],
+          quickReplies:
+            backendChips.length > 0
+              ? backendChips
+              : [
+                  "Track my order",
+                  "Shipping times",
+                  "Returns & refunds",
+                  "Talk to a human",
+                ],
           orderCard: null,
         };
 
@@ -99,30 +128,15 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch {
-    // Backend offline / booting up — fall back to local assistant engine below
+    // Backend offline / booting up — no local fallback engine; surface the fault
   }
 
-  // 3. Fallback to local assistant engine only when backend is unavailable
-  const outcome = await runAssistant(session, message);
-  const responseText = outcome.response;
-  const escalated = session.escalated && session.escalationStatus !== "resolved";
-
-  await appendMessage(session.id, "assistant", responseText, {
-    orderCard: outcome.orderCard ?? undefined,
-  });
-
-  // Small natural delay so typing indicator reads smoothly
-  await sleep(350 + Math.random() * 300);
-
-  const payload: ChatResponse = {
-    response: responseText,
-    escalated,
-    handoffJustHappened: outcome.handoffJustHappened,
-    escalationRef: session.escalationRef ?? null,
-    quickReplies: outcome.quickReplies,
-    orderCard: outcome.orderCard,
-  };
-  return Response.json(payload);
+  // 3. Backend unavailable — fail loudly so the outage is visible,
+  //    instead of silently degrading to a second bot implementation.
+  return Response.json(
+    { error: "Support assistant is temporarily unavailable. Please try again in a moment." },
+    { status: 503 },
+  );
 }
 
 /** GET /api/chat?sessionId=… — restore the transcript (widget reopen + polling). */

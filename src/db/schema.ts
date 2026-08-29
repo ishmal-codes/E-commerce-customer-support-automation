@@ -28,8 +28,10 @@ export type SessionContext = {
   awaiting?: "order_number" | null;
   /** Why we asked for the order number (changes the follow-up answer). */
   awaitingReason?: "status" | "return" | null;
-  /** Consecutive unanswered/confused turns — the 2nd one escalates. */
+  /** Consecutive unanswered/confused turns — the 2nd one offers a handoff. */
   fallbackCount?: number;
+  /** The bot asked "connect you with a human?" and is waiting for the choice. */
+  awaitingHandoffConfirm?: boolean;
 };
 
 /** Optional structured payload attached to a stored message. */

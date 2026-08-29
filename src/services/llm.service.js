@@ -1,202 +1,279 @@
-'use strict';
+/**
+ * Trevolk Support Bot — LLM service (function-calling agent loop)
+ *
+ * Provider strategy: Gemini-primary, Groq-fallback (unchanged policy).
+ *   - If Gemini fails BEFORE any tool has been executed, the whole turn is
+ *     retried on Groq from scratch (both loops are stateless, so this is safe).
+ *   - If Gemini fails MID-LOOP (after tool results exist), we do NOT replay
+ *     the half-conversation into Groq (different function-calling formats).
+ *     Instead we surface the error and the controller emits the safe refusal.
+ *
+ * The loop: user message → LLM (with tool definitions) → LLM calls tools →
+ * backend executes tools against real data → results fed back → repeat up to
+ * MAX_TOOL_ROUNDS → LLM composes a FINAL text answer using ONLY tool results.
+ *
+ * Returns everything the controller needs: final text, provider used,
+ * accumulated token/cost metrics, the tool-call trace (for transparency and
+ * logs), and the raw tool-result JSON corpus (grounding context).
+ */
 
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Groq = require('groq-sdk');
-const config = require('../config');
-const { recordUsage } = require('../utils/tokenTracker');
+const config = require('../config/index');
+const toolsService = require('./tools.service');
+
+const MAX_TOOL_ROUNDS = 4;
+
+let geminiModel = null;
+let groqClient = null;
 
 /**
- * llm.service.js
- * Dual-LLM pipeline: Gemini (primary) → Groq (automatic fallback).
- *
- * Fallback triggers:
- *   - Gemini API error (any status code)
- *   - Gemini rate-limit (429)
- *   - Gemini call exceeds LLM_TIMEOUT_MS
- *   - Gemini API key not configured
- *
- * Returns a standardised response object regardless of which LLM was used.
+ * Lazily create the Gemini model only when the API key is configured.
+ * @returns {object|null}
  */
-
-// ── Gemini setup ─────────────────────────────────────────────────────────────
-let _geminiClient = null;
-let _geminiModel = null;
-
-function _getGeminiModel() {
-  if (_geminiModel) return _geminiModel;
-  if (!config.gemini.apiKey) throw new Error('Gemini API key not configured');
-  _geminiClient = new GoogleGenerativeAI(config.gemini.apiKey);
-  _geminiModel = _geminiClient.getGenerativeModel({
-    model: config.gemini.model,
-    safetySettings: [
-      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    ],
-  });
-  return _geminiModel;
-}
-
-// ── Groq setup ───────────────────────────────────────────────────────────────
-let _groqClient = null;
-
-function _getGroqClient() {
-  if (_groqClient) return _groqClient;
-  if (!config.groq.apiKey) throw new Error('Groq API key not configured');
-  _groqClient = new Groq({ apiKey: config.groq.apiKey });
-  return _groqClient;
-}
-
-// ── Timeout wrapper ───────────────────────────────────────────────────────────
-function withTimeout(promise, ms) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`LLM call timed out after ${ms}ms`)), ms);
-    promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); }
-    );
-  });
-}
-
-/**
- * Call Gemini with the given system prompt, history, and user message.
- *
- * @param {string} systemPrompt
- * @param {Array<{role:string,content:string}>} history - Previous conversation turns
- * @param {string} userMessage
- * @returns {Promise<{ text: string, inputTokens: number, outputTokens: number }>}
- */
-async function _callGemini(systemPrompt, history, userMessage) {
-  const model = _getGeminiModel();
-
-  // Gemini uses { role: 'user' | 'model', parts: [{ text }] }
-  const geminiHistory = history.map((turn) => ({
-    role: turn.role === 'assistant' ? 'model' : turn.role,
-    parts: [{ text: turn.content }],
-  }));
-
-  const chat = model.startChat({
-    history: geminiHistory,
-    // Gemini requires systemInstruction as a Content object, not a plain string
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: {
-      maxOutputTokens: 512,
-      temperature: 0.3,    // Low temp for factual support responses
-      topP: 0.8,
-    },
-  });
-
-  const result = await chat.sendMessage(userMessage);
-  const response = result.response;
-  const text = response.text();
-
-  // Extract token usage from Gemini response metadata
-  const usageMetadata = response.usageMetadata || {};
-  const inputTokens = usageMetadata.promptTokenCount || Math.ceil((systemPrompt.length + userMessage.length) / 4);
-  const outputTokens = usageMetadata.candidatesTokenCount || Math.ceil(text.length / 4);
-
-  return { text, inputTokens, outputTokens };
-}
-
-/**
- * Call Groq with the given system prompt, history, and user message.
- *
- * @param {string} systemPrompt
- * @param {Array<{role:string,content:string}>} history
- * @param {string} userMessage
- * @returns {Promise<{ text: string, inputTokens: number, outputTokens: number }>}
- */
-async function _callGroq(systemPrompt, history, userMessage) {
-  const groq = _getGroqClient();
-
-  // Groq uses OpenAI-compatible message format: user / assistant / system
-  const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history.map((turn) => ({
-      role: turn.role === 'model' ? 'assistant' : turn.role,
-      content: turn.content,
-    })),
-    { role: 'user', content: userMessage },
-  ];
-
-  const completion = await groq.chat.completions.create({
-    model: config.groq.model,
-    messages,
-    max_tokens: 512,
-    temperature: 0.3,
-    top_p: 0.8,
-  });
-
-  const choice = completion.choices[0];
-  const text = choice.message.content || '';
-  const inputTokens = completion.usage?.prompt_tokens || Math.ceil((systemPrompt.length + userMessage.length) / 4);
-  const outputTokens = completion.usage?.completion_tokens || Math.ceil(text.length / 4);
-
-  return { text, inputTokens, outputTokens };
-}
-
-/**
- * Generate a chat response using the dual-LLM pipeline.
- * Gemini is tried first; Groq is used automatically on any failure.
- *
- * @param {object} params
- * @param {string} params.sessionId
- * @param {string} params.systemPrompt - Assembled by promptBuilder
- * @param {Array} params.history - Conversation history (trimmed)
- * @param {string} params.userMessage - Current user turn
- * @returns {Promise<{
- *   text: string,
- *   sourcesUsed: string[],
- *   costMetrics: object,
- *   providerUsed: string
- * }>}
- */
-async function generateResponse({ sessionId, systemPrompt, history, userMessage }) {
-  let providerUsed = null;
-  let llmResult = null;
-
-  // ── Attempt Gemini ───────────────────────────────────────────────────────
-  if (config.gemini.apiKey) {
-    try {
-      llmResult = await withTimeout(
-        _callGemini(systemPrompt, history, userMessage),
-        config.llm.timeoutMs
-      );
-      providerUsed = 'gemini';
-      console.log(`[LLM] Gemini responded (session: ${sessionId})`);
-    } catch (geminiErr) {
-      console.warn(`[LLM] Gemini failed, falling back to Groq. Reason: ${geminiErr.message}`);
-    }
-  } else {
-    console.warn('[LLM] Gemini API key not set — skipping to Groq fallback.');
+function getGeminiModel() {
+  if (!config.gemini.apiKey) return null;
+  if (!geminiModel) {
+    const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
+    geminiModel = genAI.getGenerativeModel({ model: config.gemini.model });
   }
+  return geminiModel;
+}
 
-  // ── Fallback to Groq ─────────────────────────────────────────────────────
-  if (!llmResult) {
-    if (!config.groq.apiKey) {
-      throw new Error('Both Gemini and Groq failed or are unconfigured. Cannot generate response.');
-    }
-    try {
-      llmResult = await withTimeout(
-        _callGroq(systemPrompt, history, userMessage),
-        config.llm.timeoutMs
-      );
-      providerUsed = 'groq';
-      console.log(`[LLM] Groq fallback responded (session: ${sessionId})`);
-    } catch (groqErr) {
-      throw new Error(`All LLM providers failed. Groq error: ${groqErr.message}`);
-    }
+/**
+ * Lazily create the Groq client only when the API key is configured.
+ * @returns {object|null}
+ */
+function getGroqClient() {
+  if (!config.groq.apiKey) return null;
+  if (!groqClient) {
+    groqClient = new Groq({ apiKey: config.groq.apiKey });
   }
+  return groqClient;
+}
 
-  // ── Record token usage ───────────────────────────────────────────────────
-  const modelName = providerUsed === 'gemini' ? config.gemini.model : config.groq.model;
-  const costMetrics = recordUsage(sessionId, modelName, llmResult.inputTokens, llmResult.outputTokens);
+/** Wrap a promise with the configured LLM timeout. */
+function withTimeout(promise, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${config.llm.timeoutMs}ms`)), config.llm.timeoutMs),
+    ),
+  ]);
+}
 
+/* --------------------------------------------------------------------- */
+/* Shared collector: accumulates tokens, costs and the tool trace         */
+/* --------------------------------------------------------------------- */
+
+function newCollector() {
   return {
-    text: llmResult.text,
-    sourcesUsed: [providerUsed],
-    costMetrics,
-    providerUsed,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    cost: 0,
+    durationMs: 0,
+    toolsCalled: [], // [{ tool, args, summary }]
+    toolResults: [], // [{ tool, result }] — the grounding corpus
   };
 }
 
-module.exports = { generateResponse };
+function recordToolExecution(collector, name, args, result) {
+  collector.toolsCalled.push({ tool: name, args, summary: toolsService.summarizeToolResult(name, result) });
+  collector.toolResults.push({ tool: name, result });
+}
+
+function buildOutcome(collector, text, providerUsed, startTime) {
+  return {
+    text,
+    providerUsed,
+    costMetrics: {
+      provider: providerUsed,
+      model: providerUsed === 'gemini' ? config.gemini.model : config.groq.model,
+      inputTokens: collector.inputTokens,
+      outputTokens: collector.outputTokens,
+      totalTokens: collector.totalTokens,
+      estimatedCostUSD: collector.cost,
+      latencyMs: Date.now() - startTime,
+    },
+    toolsCalled: collector.toolsCalled,
+    toolContextText: collector.toolResults
+      .map((t) => `${t.tool}: ${JSON.stringify(t.result)}`)
+      .join('\n'),
+    toolProducts: collector.toolResults.flatMap((t) => toolsService.extractProductsFromResult(t.result)),
+  };
+}
+
+/* --------------------------------------------------------------------- */
+/* Gemini agent loop (native function calling)                            */
+/* --------------------------------------------------------------------- */
+
+async function runGeminiAgent({ model, systemPrompt, history, userMessage, collector }) {
+  // Convert session history to Gemini content format.
+  const geminiHistory = history
+    .map((m) => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }],
+    }));
+
+  const chat = model.startChat({
+    history: geminiHistory,
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    tools: [{ functionDeclarations: toolsService.TOOL_DEFINITIONS }],
+    generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+  });
+
+  let pending = userMessage;
+
+  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    const result = await withTimeout(chat.sendMessage(pending), `Gemini round ${round}`);
+    const response = result.response;
+
+    const usage = response.usageMetadata || {};
+    collector.inputTokens += usage.promptTokenCount || 0;
+    collector.outputTokens += usage.candidatesTokenCount || 0;
+    collector.totalTokens += usage.totalTokenCount || 0;
+
+    const functionCalls = response.functionCalls ? response.functionCalls() : [];
+
+    if (!functionCalls || functionCalls.length === 0) {
+      // No tool calls → final text answer.
+      return response.text() || '';
+    }
+
+    // Execute every requested tool call against the real data sources and
+    // feed the results back as functionResponse parts.
+    const responseParts = [];
+    for (const fc of functionCalls) {
+      const args = fc.args || {};
+      const toolResult = await toolsService.executeTool(fc.name, args);
+      recordToolExecution(collector, fc.name, args, toolResult);
+      responseParts.push({ functionResponse: { name: fc.name, response: { result: toolResult } } });
+    }
+    pending = { role: 'user', parts: responseParts };
+  }
+
+  // Round cap exhausted without a final answer.
+  return '';
+}
+
+/* --------------------------------------------------------------------- */
+/* Groq agent loop (OpenAI-compatible tool_calls)                         */
+/* --------------------------------------------------------------------- */
+
+async function runGroqAgent({ client, systemPrompt, history, userMessage, collector }) {
+  const groqHistory = history.map((m) => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: m.content,
+  }));
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...groqHistory,
+    { role: 'user', content: userMessage },
+  ];
+
+  // gpt-oss models on Groq REQUIRE temperature=1.0; other models use 0.3.
+  const isGptOss = config.groq.model.includes('gpt-oss');
+
+  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    const completion = await withTimeout(
+      client.chat.completions.create({
+        model: config.groq.model,
+        messages,
+        tools: toolsService.toGroqTools(),
+        tool_choice: 'auto', // Groq does not support 'required'/'none'
+        temperature: isGptOss ? 1 : 0.3,
+        max_tokens: 1024,
+      }),
+      `Groq round ${round}`,
+    );
+
+    collector.inputTokens += completion.usage?.prompt_tokens || 0;
+    collector.outputTokens += completion.usage?.completion_tokens || 0;
+    collector.totalTokens += completion.usage?.total_tokens || 0;
+
+    const msg = completion.choices?.[0]?.message;
+    if (!msg) return '';
+
+    if (!msg.tool_calls || msg.tool_calls.length === 0) {
+      return msg.content || '';
+    }
+
+    // Persist the assistant's tool-call message, then append tool results.
+    messages.push({ role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls });
+    for (const tc of msg.tool_calls) {
+      let args = {};
+      try {
+        args = tc.function?.arguments ? JSON.parse(tc.function.arguments) : {};
+      } catch {
+        args = {};
+      }
+      const toolResult = await toolsService.executeTool(tc.function.name, args);
+      recordToolExecution(collector, tc.function.name, args, toolResult);
+      messages.push({
+        role: 'tool',
+        tool_call_id: tc.id,
+        content: JSON.stringify(toolResult),
+      });
+    }
+  }
+
+  return '';
+}
+
+/* --------------------------------------------------------------------- */
+/* Public API                                                             */
+/* --------------------------------------------------------------------- */
+
+/**
+ * Run the full tool-calling agent turn with Gemini-primary / Groq-fallback.
+ *
+ * @param {object} opts
+ * @param {string} opts.sessionId - Session ID for logging.
+ * @param {string} opts.systemPrompt - Tool-use system prompt.
+ * @param {Array} opts.history - [{role:'user'|'assistant', content}]
+ * @param {string} opts.userMessage - The new user message.
+ * @returns {Promise<{text: string, providerUsed: string, costMetrics: object,
+ *   toolsCalled: Array, toolContextText: string, toolProducts: Array}>}
+ */
+async function generateAgentResponse({ sessionId, systemPrompt, history, userMessage }) {
+  const startTime = Date.now();
+  const model = getGeminiModel();
+
+  // 1. Gemini primary
+  if (model) {
+    const collector = newCollector();
+    try {
+      const text = await runGeminiAgent({ model, systemPrompt, history, userMessage, collector });
+      collector.durationMs = Date.now() - startTime;
+      console.log(`[LLM] Gemini agent (${sessionId}): ${collector.toolsCalled.length} tool call(s), ${collector.totalTokens} tokens`);
+      return buildOutcome(collector, text, 'gemini', startTime);
+    } catch (err) {
+      console.error(`[LLM] Gemini agent failed (${sessionId}): ${err.message}`);
+      // Mid-loop failure with executed tools: replaying into Groq would mix
+      // incompatible function-calling formats. Let the controller refuse safely.
+      if (collector.toolsCalled.length > 0) {
+        throw err;
+      }
+    }
+  } else {
+    console.warn('[LLM] Gemini API key not configured.');
+  }
+
+  // 2. Groq fallback (fresh turn — safe because no tool state exists yet)
+  const client = getGroqClient();
+  if (!client) {
+    throw new Error('No LLM provider configured. Set GEMINI_API_KEY or GROQ_API_KEY.');
+  }
+
+  const collector = newCollector();
+  const text = await runGroqAgent({ client, systemPrompt, history, userMessage, collector });
+  collector.durationMs = Date.now() - startTime;
+  console.log(`[LLM] Groq agent (${sessionId}): ${collector.toolsCalled.length} tool call(s), ${collector.totalTokens} tokens`);
+  return buildOutcome(collector, text, 'groq', startTime);
+}
+
+module.exports = {
+  generateAgentResponse,
+};

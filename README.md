@@ -14,7 +14,7 @@
 ## Table of Contents
 
 - [Key Architecture Highlights](#-key-architecture-highlights)
-- [Dual Architecture Overview](#-dual-architecture-overview)
+- [Dual-Layer Architecture Overview](#-dual-layer-architecture-overview)
 - [Project Structure](#️-project-structure)
 - [Quickstart Guide](#-quickstart-guide)
 - [Agent Desk Console](#-agent-desk-console)
@@ -39,22 +39,22 @@
 
 ---
 
-## 🔄 Dual Architecture Overview
+## 🔄 Dual-Layer Architecture Overview
 
-The project runs **two independent systems** that serve the same chat widget:
+The project runs **two systems** that serve the same chat widget:
 
 | Layer | Technology | Port | Role |
 |-------|-----------|------|------|
-| **Express Backend** | Express 5 + Node.js | 3001 | Full LLM pipeline, Shopify integration, escalation, PostgreSQL persistence |
-| **Next.js Frontend** | Next.js 16 + React 19 | 3000 | Storefront UI, chat widget, API routes, frontend fallback engine |
+| **Express Backend** | Express 5 + Node.js | 3001 | Full LLM pipeline, Shopify integration, escalation, PostgreSQL persistence — the single chat engine |
+| **Next.js Frontend** | Next.js 16 + React 19 | 3000 | Storefront UI, chat widget, API proxy routes, agent desk console |
 
 **How they work together:**
 1. The chat widget calls `POST /api/chat` (Next.js API route).
 2. The Next.js route forwards the request to the Express backend with a **3-second timeout**.
-3. If the Express backend responds in time → the full LLM pipeline answer is shown.
-4. If the backend is unreachable or times out → the **frontend fallback engine** (`assistant.ts`) handles the request using regex-based intent matching against the in-memory catalog, policies, and seed orders.
+3. The Express backend returns the full LLM pipeline answer, which the route persists and relays to the widget.
+4. If the backend is unreachable or times out → the route returns **HTTP 503** and the widget shows an explicit "service unavailable" error with retry.
 
-This means the demo works **even without the Express backend running** — critical for live pitch scenarios where network or hosting issues could occur.
+The Express backend is the **single source of truth** for all chat intelligence. Both servers must be running (`npm run dev` + `npm run server`). This single-engine design avoids duplicating bot logic in two places, eliminating inconsistent-behavior bugs.
 
 ---
 
@@ -74,7 +74,7 @@ ecommerce-customer-support-automation/
 ├── src/
 │   ├── app/                               # Next.js App Router (React 19)
 │   │   ├── api/
-│   │   │   ├── chat/route.ts              # Chat endpoint (proxies to Express or falls back)
+│   │   │   ├── chat/route.ts              # Chat endpoint (proxies to Express backend)
 │   │   │   ├── desk/
 │   │   │   │   ├── route.ts               # GET — agent console queue + transcripts
 │   │   │   │   ├── reply/route.ts         # POST — agent reply to customer
@@ -90,7 +90,6 @@ ecommerce-customer-support-automation/
 │   │   └── ChatWidget.tsx                 # Floating AI support chat widget
 │   │
 │   ├── lib/
-│   │   ├── assistant.ts                   # Frontend fallback chatbot engine
 │   │   ├── catalog.ts                     # Products, policies, FAQ facts, seed orders
 │   │   ├── chat-store.ts                  # PostgreSQL message persistence helpers
 │   │   ├── desk-auth.ts                   # Shared-secret auth guard for /desk
@@ -206,7 +205,7 @@ npx tsx src/db/seed.ts
 # Terminal 1 — Start the Next.js frontend
 npm run dev
 
-# Terminal 2 — Start the Express backend (optional; frontend has fallback)
+# Terminal 2 — Start the Express backend (required — it is the chat engine)
 npm run server
 ```
 

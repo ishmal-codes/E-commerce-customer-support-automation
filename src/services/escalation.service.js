@@ -12,8 +12,11 @@ const config = require('../config');
  *
  * Escalation triggers:
  *   A. Keyword-based: refund, payment dispute, chargeback, legal, fraud, etc.
- *   B. Low-confidence: LLM response contains uncertainty markers.
- *   C. Explicit caller signal: controller can pass forceEscalate = true.
+ *   B. Low-confidence: LLM response contains uncertainty markers (safety net).
+ *   C. Explicit caller signal: controller passes forceEscalate = true when the
+ *      pipeline deterministically refused (no data retrieved / grounding
+ *      violation). This is the primary refusal trigger — it does NOT depend
+ *      on any specific wording in the bot's reply text.
  */
 
 // ── Escalation keyword list ─────────────────────────────────────────────────
@@ -36,8 +39,9 @@ const ESCALATION_KEYWORDS = [
   'social media', 'news report', 'expose you', 'i demand',
 
   // Explicit human request
-  'speak to a human', 'talk to a person', 'real person', 'live agent',
-  'human support', 'escalate', 'supervisor', 'manager',
+  'speak to a human', 'talk to a human', 'talk to a person', 'real person',
+  'live agent', 'human support', 'connect me with a human', 'escalate',
+  'supervisor', 'manager',
 ];
 
 // ── LLM low-confidence markers ─────────────────────────────────────────────
@@ -59,12 +63,13 @@ const LOW_CONFIDENCE_MARKERS = [
  *
  * @param {string} userMessage - Raw user input
  * @param {string} [llmResponse] - Optional: the LLM's draft response (for confidence check)
- * @param {boolean} [forceEscalate] - Hard override from controller
+ * @param {boolean} [forceEscalate] - Hard override from controller (structured refusal signal)
+ * @param {string} [forceReason] - Explicit reason recorded for the forced escalation
  * @returns {{ shouldEscalate: boolean, reason: string }}
  */
-function detectEscalation(userMessage, llmResponse = '', forceEscalate = false) {
+function detectEscalation(userMessage, llmResponse = '', forceEscalate = false, forceReason = 'forced_by_controller') {
   if (forceEscalate) {
-    return { shouldEscalate: true, reason: 'forced_by_controller' };
+    return { shouldEscalate: true, reason: forceReason };
   }
 
   const messageLower = userMessage.toLowerCase();
@@ -76,7 +81,8 @@ function detectEscalation(userMessage, llmResponse = '', forceEscalate = false) 
     return { shouldEscalate: true, reason: `keyword_match: "${triggeredKeyword}"` };
   }
 
-  // Low-confidence check on LLM response
+  // Low-confidence check on LLM response (safety net only — deterministic
+  // refusals arrive via forceEscalate and never rely on this text scan)
   if (llmResponse) {
     const uncertaintyMarker = LOW_CONFIDENCE_MARKERS.find((m) => responseLower.includes(m));
     if (uncertaintyMarker) {
